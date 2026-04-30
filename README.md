@@ -1,47 +1,51 @@
-# LIQUIDITY LOCK DASHBOARD
+# MULTISIG WALLET DASHBOARD
 
-[![Deployed on Sepolia](https://img.shields.io/badge/Etherscan-Verified-brightgreen)](https://sepolia.etherscan.io/address/0x1BA24F8ebA2d865493b8e4B3D6cd1bDe8d42338B#code)
+[![Deployed on Sepolia](https://img.shields.io/badge/Etherscan-Verified-brightgreen)](https://sepolia.etherscan.io/address/DEPLOY_ADDRESS#code)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![React](https://img.shields.io/badge/Built%20with-React-blue)
 ![Ethers.js](https://img.shields.io/badge/Ethers.js-5.8-purple)
 
 Built by [Tredway Development](https://tredwaydev.com) — professional Solidity smart contract packages for Web3 companies.
 
-A production-ready React dashboard for the LiquidityLock smart contract. Allows projects to lock LP tokens, prove liquidity commitment to investors, and withdraw tokens after the unlock period expires.
+A production-ready React dashboard for the MultiSigWallet smart contract. Allows multiple owners to submit, approve, revoke, and execute transactions collectively — no single wallet has unilateral control.
 
 > ⚠️ This dashboard connects to contracts deployed on Sepolia testnet. A full security audit is strongly recommended before any mainnet deployment.
 
 ## LIVE DEMO
 
-[token-liquidity-lock-dashboard.netlify.app](https://token-liquidity-lock-dashboard.netlify.app)
+[token-multisig-dashboard.netlify.app](https://token-multisig-dashboard.netlify.app)
 
 ## PROJECT GOALS
 
-The purpose of this dashboard is to give projects and their communities a clear, trustless interface for managing liquidity locks.
+The purpose of this dashboard is to give teams a clear, trustless interface for managing shared contract control through a multi-signature approval process.
 
-Users can lock any ERC-20 LP token for a set period of time, monitor their active locks with a live countdown timer, and withdraw tokens once the unlock period has passed. No admin controls. No backdoors. The contract is the authority.
+Owners can submit transactions, approve or revoke their signature, and execute transactions once the required threshold is met. No single owner can act alone. The contract enforces consensus.
 
 ## DASHBOARD FEATURES
 
-LOCK TOKENS
+OWNER DETECTION
 
-Connect any ERC-20 LP token address and the dashboard automatically previews the token name and symbol. Enter an amount and unlock date to lock tokens into the contract with a single transaction.
+The dashboard automatically detects whether the connected wallet is an owner of the multisig. The submit transaction form is only visible to owners. Non-owners can view transaction history and approval status but cannot interact.
 
-LIVE COUNTDOWN TIMER
+SUBMIT TRANSACTION
 
-Each active lock displays a live ticking countdown showing exactly how much time remains before withdrawal is available.
+Owners can propose any transaction by entering a destination address, optional ETH value, and optional encoded call data. Submitted transactions enter a pending state until enough owners approve.
 
-MULTIPLE LOCKS
+APPROVAL PROGRESS BAR
 
-A single wallet can manage multiple locks simultaneously across different tokens and unlock periods.
+Each pending transaction displays a live approval progress bar showing current approvals against the required threshold. The bar turns green when the threshold is met and the execute button appears.
 
-WITHDRAW
+APPROVE AND REVOKE
 
-The withdraw button is grayed out and locked until the unlock time passes. Once unlocked it turns green and withdrawal is one click away.
+Owners can approve any pending transaction with one click. If they change their mind they can revoke their approval before execution. The approval count updates in real time.
 
-ACTIVE / ALL FILTER
+EXECUTE
 
-Filter between active locks and full lock history including withdrawn locks.
+Once the required number of approvals is reached any owner can execute the transaction. The execute button only appears when the threshold is met.
+
+PENDING / EXECUTED / ALL FILTER
+
+Filter transactions by pending, executed, or full history to keep the interface clean regardless of transaction volume.
 
 WRONG NETWORK PROTECTION
 
@@ -75,8 +79,7 @@ src/
     App.js
     App.css
     contracts/
-        LiquidityLock.json
-        SampleToken.json
+        MultiSigWallet.json
         localhost.json
         sepolia.json
 
@@ -87,9 +90,9 @@ public/
 
 ### CLONE THE REPOSITORY:
 
-git clone https://github.com/Ktredway0128/token-liquidity-lock-dashboard.git
+git clone https://github.com/Ktredway0128/token-multisig-dashboard.git
 
-cd token-liquidity-lock-dashboard
+cd token-multisig-dashboard
 
 ### INSTALL DEPENDENCIES:
 
@@ -115,7 +118,7 @@ npx hardhat node
 
 2. Deploy the contracts locally:
 
-npx hardhat run scripts/deploy-demo.js --network localhost
+npx hardhat run scripts/deploy-multisig.js --network localhost
 
 3. Update src/contracts/localhost.json with the deployed addresses
 
@@ -127,25 +130,25 @@ npx hardhat run scripts/deploy-demo.js --network localhost
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| LiquidityLock | `0x1BA24F8ebA2d865493b8e4B3D6cd1bDe8d42338B` | [View on Etherscan](https://sepolia.etherscan.io/address/0x1BA24F8ebA2d865493b8e4B3D6cd1bDe8d42338B#code) |
+| MultiSigWallet | `DEPLOY_ADDRESS` | [View on Etherscan](https://sepolia.etherscan.io/address/DEPLOY_ADDRESS#code) |
 
-Deployed: 2026-04-27
+Deployed: TBD
 
 ## CONNECTED CONTRACT
 
-This dashboard connects to the LiquidityLock smart contract.
+This dashboard connects to the MultiSigWallet smart contract.
 
-Contract repository: [token-liquidity-lock](https://github.com/Ktredway0128/token-liquidity-lock)
+Contract repository: [token-multisig](https://github.com/Ktredway0128/token-multisig)
 
 ## SECURITY PRACTICES
 
-No admin keys or owner controls — the contract is the sole authority
+No admin keys or single point of control — consensus is enforced by the contract
 
-SafeERC20 used for all token transfers
+ReentrancyGuard on the execute function
 
-ReentrancyGuard on all state-changing functions
+Checks-effects-interactions pattern — state updated before external calls
 
-State updated before external calls
+Owner detection prevents non-owners from submitting transactions
 
 Wrong network detection prevents accidental transactions
 
