@@ -14,12 +14,10 @@ const MULTISIG_ABI = MultiSigWalletABI.abi;
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const PURPLE     = '#7c3aed';   // electric violet — primary action
-const PURPLE_LT  = '#8b5cf6';   // lighter violet — hover
 const LAVENDER   = '#c4b5fd';   // soft lavender — accents and borders
 const WHITE      = '#ffffff';   // primary text
 const MUTED      = '#a78bfa';   // muted lavender — subtext
 const GREEN      = '#22c55e';   // success green
-const MAROON     = '#7f1d1d';   // error red
 const CARD_BG    = 'rgba(124, 58, 237, 0.08)';
 const CARD_BDR   = 'rgba(196, 181, 253, 0.2)';
 
@@ -63,7 +61,6 @@ function App() {
   const [readMultiSig,     setReadMultiSig]     = useState(null);
   const [account,          setAccount]          = useState(null);
   const [chainId,          setChainId]          = useState(null);
-  const [multiSigAddress,  setMultiSigAddress]  = useState('');
 
   // contract info
   const [owners,           setOwners]           = useState([]);
@@ -165,7 +162,6 @@ function App() {
       setReadMultiSig(_readMultiSig);
       setAccount(_account);
       setChainId(_chainId);
-      setMultiSigAddress(_multiSigAddress);
 
       await loadDashboardData(_readMultiSig, _account);
     } catch (err) {
