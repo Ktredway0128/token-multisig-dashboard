@@ -1,6 +1,6 @@
 # MULTISIG WALLET DASHBOARD
 
-[![Deployed on Sepolia](https://img.shields.io/badge/Etherscan-Verified-brightgreen)](https://sepolia.etherscan.io/address/DEPLOY_ADDRESS#code)
+[![Deployed on Sepolia](https://img.shields.io/badge/Etherscan-Verified-brightgreen)](https://sepolia.etherscan.io/address/0xdF102938A7E1a9b387f70a229C8D2D43f5663368#code)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![React](https://img.shields.io/badge/Built%20with-React-blue)
 ![Ethers.js](https://img.shields.io/badge/Ethers.js-5.8-purple)
@@ -130,7 +130,7 @@ npx hardhat run scripts/deploy-multisig.js --network localhost
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| MultiSigWallet | `DEPLOY_ADDRESS` | [View on Etherscan](https://sepolia.etherscan.io/address/DEPLOY_ADDRESS#code) |
+| MultiSigWallet | 0xdF102938A7E1a9b387f70a229C8D2D43f5663368 | [View on Etherscan](https://sepolia.etherscan.io/address/0xdF102938A7E1a9b387f70a229C8D2D43f5663368#code) |
 
 Deployed: TBD
 
