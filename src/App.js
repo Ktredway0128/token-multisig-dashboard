@@ -78,7 +78,6 @@ function App() {
 
   // submit form
   const [toAddress,        setToAddress]        = useState('');
-  const [txValue,          setTxValue]          = useState('');
   const [txData,           setTxData]           = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
