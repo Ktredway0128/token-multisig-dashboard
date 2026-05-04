@@ -224,7 +224,7 @@ function App() {
       setTxHash(tx.hash);
       setStatus('Transaction submitted successfully!');
       setStatusStyle(STATUS_COLORS.success);
-      setToAddress(''); setTxValue(''); setTxData('');
+      setToAddress(''); setTxData('');
       await loadDashboardData(readMultiSig, account);
     } catch (err) {
       setIsLoading(false); setTxHash('');
