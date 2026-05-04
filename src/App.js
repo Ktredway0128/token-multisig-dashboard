@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import './App.css';
 import MultiSigWalletABI from './contracts/MultiSigWallet.json';
+import TreasuryABI from './contracts/Treasury.json';
 import localhostDeployment from './contracts/localhost.json';
 import sepoliaDeployment from './contracts/sepolia.json';
 
@@ -11,13 +12,15 @@ const DEPLOYMENTS = {
 };
 
 const MULTISIG_ABI = MultiSigWalletABI.abi;
+const TREASURY_ABI = TreasuryABI.abi;
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
-const PURPLE     = '#7c3aed';   // electric violet — primary action
-const LAVENDER   = '#c4b5fd';   // soft lavender — accents and borders
-const WHITE      = '#ffffff';   // primary text
-const MUTED      = '#a78bfa';   // muted lavender — subtext
-const GREEN      = '#22c55e';   // success green
+const PURPLE     = '#7c3aed';
+const LAVENDER   = '#c4b5fd';
+const WHITE      = '#ffffff';
+const MUTED      = '#a78bfa';
+const GREEN      = '#22c55e';
+const BLUE       = '#38bdf8';
 const CARD_BG    = 'rgba(124, 58, 237, 0.08)';
 const CARD_BDR   = 'rgba(196, 181, 253, 0.2)';
 
@@ -29,15 +32,15 @@ const STATUS_COLORS = {
 };
 
 const parseError = (err) => {
-  if (err.message.includes('user rejected'))           return 'Transaction rejected in MetaMask.';
-  if (err.message.includes('insufficient funds'))      return 'Insufficient funds for this transaction.';
-  if (err.message.includes('Not an owner'))            return 'Connected wallet is not an owner of this multisig.';
+  if (err.message.includes('user rejected'))              return 'Transaction rejected in MetaMask.';
+  if (err.message.includes('insufficient funds'))         return 'Insufficient funds for this transaction.';
+  if (err.message.includes('Not an owner'))               return 'Connected wallet is not an owner of this multisig.';
   if (err.message.includes('Transaction does not exist')) return 'Transaction does not exist.';
   if (err.message.includes('Transaction already executed')) return 'This transaction has already been executed.';
   if (err.message.includes('Transaction already approved')) return 'You have already approved this transaction.';
-  if (err.message.includes('Transaction not approved')) return 'You have not approved this transaction.';
-  if (err.message.includes('Not enough approvals'))    return 'Not enough approvals to execute this transaction.';
-  if (err.message.includes('Invalid address'))         return 'Invalid destination address.';
+  if (err.message.includes('Transaction not approved'))   return 'You have not approved this transaction.';
+  if (err.message.includes('Not enough approvals'))       return 'Not enough approvals to execute this transaction.';
+  if (err.message.includes('Invalid address'))            return 'Invalid destination address.';
   return 'Transaction failed. Please try again.';
 };
 
@@ -61,6 +64,7 @@ function App() {
   const [readMultiSig,     setReadMultiSig]     = useState(null);
   const [account,          setAccount]          = useState(null);
   const [chainId,          setChainId]          = useState(null);
+  const [treasuryAddress,  setTreasuryAddress]  = useState('');
 
   // contract info
   const [owners,           setOwners]           = useState([]);
@@ -76,12 +80,24 @@ function App() {
   const [toAddress,        setToAddress]        = useState('');
   const [txValue,          setTxValue]          = useState('');
   const [txData,           setTxData]           = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // treasury withdraw ETH form
+  const [tWithdrawTo,      setTWithdrawTo]      = useState('');
+  const [tWithdrawAmt,     setTWithdrawAmt]     = useState('');
+
+  // treasury withdraw token form
+  const [tTokenAddr,       setTTokenAddr]       = useState('');
+  const [tTokenTo,         setTTokenTo]         = useState('');
+  const [tTokenAmt,        setTTokenAmt]        = useState('');
 
   // status
   const [status,           setStatus]           = useState('');
   const [statusStyle,      setStatusStyle]      = useState(STATUS_COLORS.default);
   const [isLoading,        setIsLoading]        = useState(false);
   const [txHash,           setTxHash]           = useState('');
+
+
 
   // ── load data ───────────────────────────────────────────────────────────────
 
@@ -97,7 +113,6 @@ function App() {
       setTxCount(_txCount.toNumber());
       setIsOwner(_isOwner);
 
-      // Load all transactions
       const count = _txCount.toNumber();
       const txList = [];
 
@@ -141,6 +156,7 @@ function App() {
 
       const deployment       = DEPLOYMENTS[_chainId];
       const _multiSigAddress = deployment.MultiSigWallet.address;
+      const _treasuryAddress = deployment.Treasury?.address || '';
 
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -162,6 +178,7 @@ function App() {
       setReadMultiSig(_readMultiSig);
       setAccount(_account);
       setChainId(_chainId);
+      setTreasuryAddress(_treasuryAddress);
 
       await loadDashboardData(_readMultiSig, _account);
     } catch (err) {
@@ -197,7 +214,7 @@ function App() {
     try {
       setStatus('Submitting transaction...'); setStatusStyle(STATUS_COLORS.pending); setIsLoading(true);
 
-      const value = txValue ? ethers.utils.parseEther(txValue) : 0;
+      const value = 0;
       const data  = txData || '0x';
 
       const tx = await multiSigContract.submitTransaction(toAddress, value, data);
@@ -209,6 +226,81 @@ function App() {
       setStatus('Transaction submitted successfully!');
       setStatusStyle(STATUS_COLORS.success);
       setToAddress(''); setTxValue(''); setTxData('');
+      await loadDashboardData(readMultiSig, account);
+    } catch (err) {
+      setIsLoading(false); setTxHash('');
+      setStatus(parseError(err)); setStatusStyle(STATUS_COLORS.error);
+    }
+  };
+
+  // ── treasury withdraw ETH ───────────────────────────────────────────────────
+
+  const handleTreasuryWithdrawETH = async () => {
+    if (!ethers.utils.isAddress(tWithdrawTo)) {
+      setStatus('Please enter a valid destination address.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+    if (!tWithdrawAmt || Number(tWithdrawAmt) <= 0) {
+      setStatus('Please enter an amount greater than zero.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+    if (!treasuryAddress) {
+      setStatus('Treasury address not found.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+
+    try {
+      setStatus('Submitting treasury ETH withdrawal...'); setStatusStyle(STATUS_COLORS.pending); setIsLoading(true);
+
+      const iface = new ethers.utils.Interface(TREASURY_ABI);
+      const amount = ethers.utils.parseEther(tWithdrawAmt);
+      const data = iface.encodeFunctionData('withdrawETH', [tWithdrawTo, amount]);
+
+      const tx = await multiSigContract.submitTransaction(treasuryAddress, 0, data);
+      await tx.wait();
+      await new Promise(r => setTimeout(r, 2000));
+
+      setIsLoading(false);
+      setTxHash(tx.hash);
+      setStatus('Treasury ETH withdrawal submitted! Awaiting approvals.');
+      setStatusStyle(STATUS_COLORS.success);
+      setTWithdrawTo(''); setTWithdrawAmt('');
+      await loadDashboardData(readMultiSig, account);
+    } catch (err) {
+      setIsLoading(false); setTxHash('');
+      setStatus(parseError(err)); setStatusStyle(STATUS_COLORS.error);
+    }
+  };
+
+  // ── treasury withdraw token ─────────────────────────────────────────────────
+
+  const handleTreasuryWithdrawToken = async () => {
+    if (!ethers.utils.isAddress(tTokenAddr)) {
+      setStatus('Please enter a valid token address.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+    if (!ethers.utils.isAddress(tTokenTo)) {
+      setStatus('Please enter a valid destination address.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+    if (!tTokenAmt || Number(tTokenAmt) <= 0) {
+      setStatus('Please enter an amount greater than zero.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+    if (!treasuryAddress) {
+      setStatus('Treasury address not found.'); setStatusStyle(STATUS_COLORS.error); return;
+    }
+
+    try {
+      setStatus('Submitting treasury token withdrawal...'); setStatusStyle(STATUS_COLORS.pending); setIsLoading(true);
+
+      const iface = new ethers.utils.Interface(TREASURY_ABI);
+      const amount = ethers.utils.parseUnits(tTokenAmt, 18);
+      const data = iface.encodeFunctionData('withdrawToken', [tTokenAddr, tTokenTo, amount]);
+
+      const tx = await multiSigContract.submitTransaction(treasuryAddress, 0, data);
+      await tx.wait();
+      await new Promise(r => setTimeout(r, 2000));
+
+      setIsLoading(false);
+      setTxHash(tx.hash);
+      setStatus('Treasury token withdrawal submitted! Awaiting approvals.');
+      setStatusStyle(STATUS_COLORS.success);
+      setTTokenAddr(''); setTTokenTo(''); setTTokenAmt('');
       await loadDashboardData(readMultiSig, account);
     } catch (err) {
       setIsLoading(false); setTxHash('');
@@ -376,10 +468,10 @@ function App() {
               {/* STAT CARDS */}
               <div className="grid grid-cols-4 gap-3 mb-8">
                 {[
-                  { label: 'Owners',           value: owners.length },
-                  { label: 'Required',          value: `${required} of ${owners.length}` },
+                  { label: 'Owners',            value: owners.length },
+                  { label: 'Required',           value: `${required} of ${owners.length}` },
                   { label: 'Total Transactions', value: txCount },
-                  { label: 'Network',           value: chainId === '0xaa36a7' ? 'Sepolia' : 'Localhost' },
+                  { label: 'Network',            value: chainId === '0xaa36a7' ? 'Sepolia' : 'Localhost' },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-2xl p-4 shadow-sm card-hover"
                     style={{
@@ -422,9 +514,85 @@ function App() {
                 ))}
               </div>
 
-              {/* SUBMIT TRANSACTION CARD */}
-              {isOwner && (
+              {/* TREASURY ACTIONS — owner only */}
+              {isOwner && treasuryAddress && (
                 <div className="rounded-2xl p-6 mb-8 shadow-sm card-hover"
+                  style={{
+                    backgroundColor: CARD_BG,
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: `1px solid ${CARD_BDR}`,
+                    borderLeft: `4px solid ${BLUE}`,
+                  }}>
+                  <h2 className="text-lg font-bold mb-1" style={{ color: WHITE }}>Treasury Actions</h2>
+                  <p className="text-xs mb-6" style={{ color: MUTED }}>
+                    Submits a withdrawal transaction to the treasury. Requires {required} owner approval{required > 1 ? 's' : ''} before execution.
+                  </p>
+
+                  {/* Withdraw ETH */}
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: BLUE }}>Withdraw ETH from Treasury</h3>
+
+                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Destination Address</p>
+                  <input type="text" placeholder="0x... destination address"
+                    value={tWithdrawTo} onChange={(e) => setTWithdrawTo(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(56, 189, 248, 0.08)' }} />
+
+                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Amount (ETH)</p>
+                  <input type="number" placeholder="e.g. 0.5"
+                    value={tWithdrawAmt} onChange={(e) => setTWithdrawAmt(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(56, 189, 248, 0.08)' }} />
+
+                  <button onClick={handleTreasuryWithdrawETH} disabled={isLoading}
+                    className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 btn-hover mb-8"
+                    style={{
+                      backgroundColor: BLUE,
+                      opacity: isLoading ? 0.6 : 1,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                    }}>
+                    ↑ Submit ETH Withdrawal
+                  </button>
+
+                  {/* Divider */}
+                  <hr style={{ borderColor: CARD_BDR, marginBottom: '1.5rem' }} />
+
+                  {/* Withdraw Token */}
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: BLUE }}>Withdraw Token from Treasury</h3>
+
+                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Token Address</p>
+                  <input type="text" placeholder="0x... ERC-20 token address"
+                    value={tTokenAddr} onChange={(e) => setTTokenAddr(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(56, 189, 248, 0.08)' }} />
+
+                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Destination Address</p>
+                  <input type="text" placeholder="0x... destination address"
+                    value={tTokenTo} onChange={(e) => setTTokenTo(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(56, 189, 248, 0.08)' }} />
+
+                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Amount</p>
+                  <input type="number" placeholder="e.g. 1000"
+                    value={tTokenAmt} onChange={(e) => setTTokenAmt(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(56, 189, 248, 0.08)' }} />
+
+                  <button onClick={handleTreasuryWithdrawToken} disabled={isLoading}
+                    className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 btn-hover"
+                    style={{
+                      backgroundColor: BLUE,
+                      opacity: isLoading ? 0.6 : 1,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                    }}>
+                    ↑ Submit Token Withdrawal
+                  </button>
+                </div>
+              )}
+
+              {/* SUBMIT TRANSACTION CARD — collapsible */}
+              {isOwner && (
+                <div className="rounded-2xl mb-8 shadow-sm"
                   style={{
                     backgroundColor: CARD_BG,
                     backdropFilter: 'blur(12px)',
@@ -432,39 +600,51 @@ function App() {
                     border: `1px solid ${CARD_BDR}`,
                     borderLeft: `4px solid ${PURPLE}`,
                   }}>
-                  <h2 className="text-lg font-bold mb-4" style={{ color: WHITE }}>Submit Transaction</h2>
-
-                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Destination Address</p>
-                  <input type="text" placeholder="0x... destination address"
-                    value={toAddress} onChange={(e) => setToAddress(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
-                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(124, 58, 237, 0.1)' }} />
-
-                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>ETH Value (optional)</p>
-                  <input type="number" placeholder="0.0"
-                    value={txValue} onChange={(e) => setTxValue(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
-                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(124, 58, 237, 0.1)' }} />
-
-                  <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Call Data (optional)</p>
-                  <input type="text" placeholder="0x (leave empty for simple ETH transfer)"
-                    value={txData} onChange={(e) => setTxData(e.target.value)}
-                    className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-6"
-                    style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(124, 58, 237, 0.1)' }} />
-
-                  <button onClick={handleSubmit} disabled={isLoading}
-                    className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 btn-hover"
-                    style={{
-                      backgroundColor: PURPLE,
-                      opacity: isLoading ? 0.6 : 1,
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                    }}>
-                    ✦ Submit Transaction
+                  
+                  {/* Header — always visible */}
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full p-6 flex justify-between items-center"
+                    style={{ cursor: 'pointer', background: 'none', border: 'none' }}>
+                    <div className="text-left">
+                      <h2 className="text-lg font-bold" style={{ color: WHITE }}>Submit Transaction</h2>
+                      <p className="text-xs mt-1" style={{ color: MUTED }}>For advanced use — call any contract function directly</p>
+                    </div>
+                    <span style={{ color: MUTED, fontSize: '1.2rem', transition: 'transform 0.2s', transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                      ▼
+                    </span>
                   </button>
 
-                  <p className="text-xs mt-3" style={{ color: MUTED }}>
-                    Submitted transactions require {required} owner approval{required > 1 ? 's' : ''} before execution.
-                  </p>
+                  {/* Collapsible body */}
+                  {showAdvanced && (
+                    <div className="px-6 pb-6">
+                      <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Destination Address</p>
+                      <input type="text" placeholder="0x... destination address"
+                        value={toAddress} onChange={(e) => setToAddress(e.target.value)}
+                        className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-4"
+                        style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(124, 58, 237, 0.1)' }} />
+
+                      <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MUTED }}>Call Data (optional)</p>
+                      <input type="text" placeholder="0x — encoded function call for any contract interaction"
+                        value={txData} onChange={(e) => setTxData(e.target.value)}
+                        className="w-full border rounded-xl px-4 py-3 text-sm outline-none mb-6"
+                        style={{ borderColor: CARD_BDR, color: WHITE, backgroundColor: 'rgba(124, 58, 237, 0.1)' }} />
+
+                      <button onClick={handleSubmit} disabled={isLoading}
+                        className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 btn-hover"
+                        style={{
+                          backgroundColor: PURPLE,
+                          opacity: isLoading ? 0.6 : 1,
+                          cursor: isLoading ? 'not-allowed' : 'pointer',
+                        }}>
+                        ✦ Submit Transaction
+                      </button>
+
+                      <p className="text-xs mt-3" style={{ color: MUTED }}>
+                      Use this for any contract interaction beyond treasury withdrawals. Requires {required} owner approvals before execution.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -517,7 +697,6 @@ function App() {
                         border: `1px solid ${tx.executed ? 'rgba(34, 197, 94, 0.2)' : CARD_BDR}`,
                       }}>
 
-                      {/* TX Header */}
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <p className="text-sm font-bold" style={{ color: WHITE }}>
@@ -542,7 +721,6 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Approval bar */}
                       <div className="w-full rounded-full mb-4" style={{ height: '4px', backgroundColor: 'rgba(196, 181, 253, 0.15)' }}>
                         <div className="rounded-full" style={{
                           height: '4px',
@@ -552,7 +730,6 @@ function App() {
                         }} />
                       </div>
 
-                      {/* Buttons */}
                       {!tx.executed && isOwner && (
                         <div className="flex gap-2">
                           {!tx.userApproved ? (

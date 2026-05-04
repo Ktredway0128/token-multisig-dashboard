@@ -1,5 +1,8 @@
 {
   "MultiSigWallet": {
     "address": "0xdF102938A7E1a9b387f70a229C8D2D43f5663368"
+  },
+  "Treasury": {
+    "address": "0x380923344A792D3D63a18172Cc16568b8a1FE9cF"
   }
 }
